@@ -308,17 +308,20 @@ void load_map(uint32_t resource_id) {
 }
 
 static void core_loop(void *data) {
-  AccelData accel_data = {0,};
-  accel_service_peek(&accel_data);
+  if (s_kart->laps < 4)
+  {
+    AccelData accel_data = {0,};
+    accel_service_peek(&accel_data);
 
-  kart_steer(s_kart, accel_data.x, s_kart->dr);
-  kart_update(s_kart);
-  for (int ii = 0; ii < NUM_OTHER_KARTS; ii++) {
-    kart_update(s_other_karts[ii]);
+    kart_steer(s_kart, accel_data.x, s_kart->dr);
+    kart_update(s_kart);
+    for (int ii = 0; ii < NUM_OTHER_KARTS; ii++) {
+      kart_update(s_other_karts[ii]);
+    }
+
+    layer_mark_dirty(s_window_layer);
+    s_timer = app_timer_register(20, core_loop, NULL);
   }
-
-  layer_mark_dirty(s_window_layer);
-  s_timer = app_timer_register(20, core_loop, NULL);
 }
 
 static void window_load(Window *window) {
