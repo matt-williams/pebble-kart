@@ -7,10 +7,15 @@ static uint8_t *s_map;
 static GBitmap *s_tiles;
 static uint8_t *s_tile_data;
 static GBitmap *s_sky;
-static uint8_t *s_sky_data;
 static GBitmap *s_font;
 static uint8_t *s_font_data;
 static AppTimer *s_timer;
+
+#define TWICE_COS_HALF_FOV_X (0x10000 / 16)
+#define TWICE_COS_HALF_FOV_Y (0x10000 / 8)
+#define DISPLAY_WIDTH 144
+#define DISPLAY_HEIGHT 152
+#define CAM_Y 0x10000
 
 int s_laps;
 int s_pos;
@@ -105,7 +110,6 @@ void kart_update(Kart* kart)
     kart->z = new_z;
   }
 
-  app_log(APP_LOG_LEVEL_ERROR, "race.c", 1, "Old tile %d (%d %d) - new tile %d (%d %d)", old_tile, is_tile_x_finish_line(old_tile), is_tile_z_finish_line(old_tile), new_tile, is_tile_x_finish_line(new_tile), is_tile_z_finish_line(new_tile));  
   if (!is_tile_x_finish_line(old_tile) &&
       !is_tile_z_finish_line(old_tile))
   {
@@ -130,7 +134,7 @@ void kart_update(Kart* kart)
 }
 
 
-void draw_status(uint8_t* raw, uint32_t time_ms, int lap, int pos, bool flash)
+static void draw_status(uint8_t* raw, uint32_t time_ms, int lap, int pos, bool flash)
 {
   int mins = time_ms / 60000;
   int ten_secs = (time_ms % 60000) / 10000;
@@ -166,6 +170,33 @@ void draw_status(uint8_t* raw, uint32_t time_ms, int lap, int pos, bool flash)
       raw[x + y * 20] = s_font_data[glyphs[x] + y * 16];
     }
   }
+  for (int y = 16; y < 28; y++)
+  {
+    for (int x = 0; x < 18; x++)
+    {
+      raw[x + y * 20] = 0;
+    }
+  }
+}
+
+
+static void draw_sky(GContext* context, int32_t r)
+{
+  int32_t r_pixels = r * DISPLAY_WIDTH / 0x4000;
+
+  GRect rect = {.origin = {.x = r_pixels, .y = 0}, .size = {.w = (r_pixels + DISPLAY_WIDTH > 288) ? 288 - r_pixels : DISPLAY_WIDTH, .h = 48}};
+  GBitmap* sky_section = gbitmap_create_as_sub_bitmap(s_sky, rect);
+  rect.origin = (GPoint){.x = 0, .y = DISPLAY_HEIGHT/2 - 48};
+  graphics_draw_bitmap_in_rect(context, sky_section, rect);
+  gbitmap_destroy(sky_section);
+
+  if (rect.size.w != DISPLAY_WIDTH) {
+    rect = (GRect){.origin = {.x = 0, .y = 0}, .size = {.w = r_pixels + DISPLAY_WIDTH - 288, .h = 48}};
+    sky_section = gbitmap_create_as_sub_bitmap(s_sky, rect);
+    rect.origin = (GPoint){.x = 288 - r_pixels, .y = DISPLAY_HEIGHT/2 - 48};
+    graphics_draw_bitmap_in_rect(context, sky_section, rect);
+    gbitmap_destroy(sky_section);
+  }
 }
 
 static void up_click_handler(ClickRecognizerRef recognizer, void *context) {
@@ -185,12 +216,6 @@ static void click_config_provider(void *context) {
   window_raw_click_subscribe(BUTTON_ID_DOWN, down_click_handler, release_handler, NULL);
 }
 
-#define TWICE_COS_HALF_FOV_X (0x10000 / 16)
-#define TWICE_COS_HALF_FOV_Y (0x10000 / 8)
-#define DISPLAY_WIDTH 144
-#define DISPLAY_HEIGHT 168
-#define CAM_Y 0x10000
-
 inline static int get_bit_3d(int32_t x, int32_t y)
 {
   int32_t rx = (x - DISPLAY_WIDTH / 2) * TWICE_COS_HALF_FOV_X / DISPLAY_WIDTH;
@@ -203,7 +228,7 @@ inline static int get_bit_3d(int32_t x, int32_t y)
 }
 
 static void update_proc(Layer *this_layer, GContext *context) {
-  GBitmap* display = (GBitmap*)context;
+  GBitmap* display = graphics_capture_frame_buffer(context);
   uint32_t* raw = (uint32_t*)gbitmap_get_data(display);
   GRect bounds = gbitmap_get_bounds(display);
   int row_size_words = (bounds.size.w + 31) / 32;
@@ -219,6 +244,8 @@ static void update_proc(Layer *this_layer, GContext *context) {
     }
   }
 
+  graphics_release_frame_buffer(context, display);
+  draw_sky(context, s_kart->r);
 }
 
 static void window_load(Window *window) {
@@ -258,8 +285,7 @@ void start_race(uint32_t resource_id) {
   load_map(resource_id);
   s_tiles = gbitmap_create_with_resource(RESOURCE_ID_TILES);
   s_tile_data = gbitmap_get_data(s_tiles);
-  s_sky = gbitmap_create_with_resource(RESOURCE_ID_TILES);
-  s_sky_data = gbitmap_get_data(s_sky);
+  s_sky = gbitmap_create_with_resource(RESOURCE_ID_SKY);
   s_font = gbitmap_create_with_resource(RESOURCE_ID_FONT);
   s_font_data = gbitmap_get_data(s_font);
 
