@@ -35,7 +35,7 @@ static void main_window_load(Window *window) {
   }
 
   s_menu_sections[0] = (SimpleMenuSection) {
-    .title = "Kart",
+    .title = "Select Track",
     .num_items = NUM_TRACKS,
     .items = s_menu_items,
   };
