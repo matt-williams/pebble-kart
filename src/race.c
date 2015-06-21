@@ -19,6 +19,7 @@ static AppTimer *s_timer;
 #define DISPLAY_HEIGHT 152
 #define CAM_Y 0x10000
 
+uint32_t s_map_resource_id;
 int s_laps;
 int s_pos;
 typedef struct TimeMs {
@@ -272,17 +273,10 @@ static void update_proc(Layer *this_layer, GContext *context) {
   kart_draw(context, s_kart, s_kart->x, s_kart->z, s_kart->r);
 }
 
-static void window_load(Window *window) {
-  Layer* window_layer = window_get_root_layer(window);
-  s_window_bounds = layer_get_bounds(window_layer);
-  GRect window_frame = layer_get_frame(window_layer);
-
-  s_window_layer = layer_create(window_frame);
-  layer_set_update_proc(s_window_layer, update_proc);
-  layer_add_child(window_layer, s_window_layer);
-}
-
-static void window_unload(Window *window) {
+void load_map(uint32_t resource_id) {
+  ResHandle handle = resource_get_handle(resource_id);
+  s_map = (uint8_t*)malloc(4096);
+  resource_load(handle, s_map, 4096);
 }
 
 static void core_loop(void *data) {
@@ -296,17 +290,10 @@ static void core_loop(void *data) {
   s_timer = app_timer_register(20, core_loop, NULL);
 }
 
-void load_map(uint32_t resource_id) {
-  ResHandle handle = resource_get_handle(resource_id);
-  s_map = (uint8_t*)malloc(4096);
-  resource_load(handle, s_map, 4096);
-}
-
-
-void start_race(uint32_t resource_id) {
+static void window_load(Window *window) {
   light_enable(true);
 
-  load_map(resource_id);
+  load_map(s_map_resource_id);
   s_kart_black = gbitmap_create_with_resource(RESOURCE_ID_KART_BLACK);
   s_kart_white = gbitmap_create_with_resource(RESOURCE_ID_KART_WHITE);
   s_tiles = gbitmap_create_with_resource(RESOURCE_ID_TILES);
@@ -320,27 +307,26 @@ void start_race(uint32_t resource_id) {
   s_pos = 1;
 
   s_kart = kart_create();
+  Layer* window_layer = window_get_root_layer(window);
+  s_window_bounds = layer_get_bounds(window_layer);
+  GRect window_frame = layer_get_frame(window_layer);
 
-  s_window = window_create();
-  window_set_click_config_provider(s_window, click_config_provider);
-  window_set_window_handlers(s_window, (WindowHandlers) {
-    .load = window_load,
-    .unload = window_unload,
-  });
-  window_stack_push(s_window, false);
+  s_window_layer = layer_create(window_frame);
+  layer_set_update_proc(s_window_layer, update_proc);
+  layer_add_child(window_layer, s_window_layer);
 
   accel_data_service_subscribe(0, NULL);
   s_timer = app_timer_register(50, core_loop, NULL);
 }
 
-
-void end_race(void) {
+static void window_unload(Window *window) {
   app_timer_cancel(s_timer);
   accel_data_service_unsubscribe();
 
-  window_destroy(s_window);
+  layer_destroy(s_window_layer);
 
   kart_destroy(s_kart);
+
   gbitmap_destroy(s_font);
   gbitmap_destroy(s_sky);
   gbitmap_destroy(s_tiles);
@@ -349,4 +335,23 @@ void end_race(void) {
   free(s_map);
 
   light_enable(false);
+}
+
+void start_race(uint32_t resource_id) {
+  s_map_resource_id = resource_id;
+
+  s_window = window_create();
+  window_set_click_config_provider(s_window, click_config_provider);
+  window_set_window_handlers(s_window, (WindowHandlers) {
+    .load = window_load,
+    .unload = window_unload,
+  });
+  window_stack_push(s_window, false);
+}
+
+void end_race(void) {
+  if (s_window != NULL) {
+    window_destroy(s_window);
+    s_window = NULL;
+  }
 }

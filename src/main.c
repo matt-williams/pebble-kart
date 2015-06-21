@@ -66,6 +66,7 @@ static void init(void) {
 }
 
 static void deinit(void) {
+  end_race();
   window_destroy(s_main_window);
 }
 
