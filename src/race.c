@@ -4,7 +4,8 @@ static Window *s_window;
 static Layer *s_window_layer;
 static GRect s_window_bounds;
 static uint8_t *s_map;
-static GBitmap *s_kart_sprites;
+static GBitmap *s_kart_black;
+static GBitmap *s_kart_white;
 static GBitmap *s_tiles;
 static uint8_t *s_tile_data;
 static GBitmap *s_sky;
@@ -135,6 +136,24 @@ void kart_update(Kart* kart)
 }
 
 
+void kart_draw(GContext* context, Kart* kart, int32_t view_x, int32_t view_z, uint16_t view_r) {
+
+  uint16_t dr = kart->r - view_r;
+  GRect src_rect = {.origin = {.x = 0, .y = 0}, .size = {.w = 64, .h = 42}};
+  GRect dst_rect = {.origin = {.x = DISPLAY_WIDTH / 2 - 32, .y = DISPLAY_HEIGHT - 42}, .size = {.w = 64, .h = 42}};
+
+  graphics_context_set_compositing_mode(context, GCompOpClear);
+  GBitmap* kart_section = gbitmap_create_as_sub_bitmap(s_kart_black, src_rect);
+  graphics_draw_bitmap_in_rect(context, kart_section, dst_rect);
+  gbitmap_destroy(kart_section);
+
+  graphics_context_set_compositing_mode(context, GCompOpOr);
+  kart_section = gbitmap_create_as_sub_bitmap(s_kart_white, src_rect);
+  graphics_draw_bitmap_in_rect(context, kart_section, dst_rect);
+  gbitmap_destroy(kart_section);
+}
+
+
 static void draw_status(uint8_t* raw, uint32_t time_ms, int lap, int pos, bool flash)
 {
   int mins = time_ms / 60000;
@@ -247,6 +266,7 @@ static void update_proc(Layer *this_layer, GContext *context) {
 
   graphics_release_frame_buffer(context, display);
   draw_sky(context, s_kart->r);
+  kart_draw(context, s_kart, s_kart->x, s_kart->z, s_kart->r);
 }
 
 static void window_load(Window *window) {
@@ -284,7 +304,8 @@ void start_race(uint32_t resource_id) {
   light_enable(true);
 
   load_map(resource_id);
-  s_kart_sprites = gbitmap_create_with_resource(RESOURCE_ID_KART);
+  s_kart_black = gbitmap_create_with_resource(RESOURCE_ID_KART_BLACK);
+  s_kart_white = gbitmap_create_with_resource(RESOURCE_ID_KART_WHITE);
   s_tiles = gbitmap_create_with_resource(RESOURCE_ID_TILES);
   s_tile_data = gbitmap_get_data(s_tiles);
   s_sky = gbitmap_create_with_resource(RESOURCE_ID_SKY);

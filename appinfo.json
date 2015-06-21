@@ -15,8 +15,39 @@
   "resources": {
     "media": [
       {
-        "name": "KART",
-        "file": "kart.png",
+        "menuIcon": true,
+        "name": "IMAGE_MENU_ICON",
+        "file": "icon.png",
+        "type": "png"
+      },
+      {
+        "name": "KART_BLACK",
+        "file": "kart_black.png",
+        "type": "png"
+      },
+      {
+        "name": "KART_WHITE",
+        "file": "kart_white.png",
+        "type": "png"
+      },
+      {
+        "name": "KART_BLACK2",
+        "file": "kart_black2.png",
+        "type": "png"
+      },
+      {
+        "name": "KART_WHITE2",
+        "file": "kart_white2.png",
+        "type": "png"
+      },
+      {
+        "name": "KART_BLACK3",
+        "file": "kart_black3.png",
+        "type": "png"
+      },
+      {
+        "name": "KART_WHITE3",
+        "file": "kart_white3.png",
         "type": "png"
       },
       {
