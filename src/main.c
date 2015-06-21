@@ -2,7 +2,7 @@
 #include "race.h"
 
 #define NUM_MENU_SECTIONS 1
-#define NUM_TRACKS 1
+#define NUM_TRACKS 2
 
 static Window *s_main_window;
 static SimpleMenuLayer *s_simple_menu_layer;
@@ -16,7 +16,8 @@ typedef struct Track {
 } Track;
 
 static Track s_tracks[NUM_TRACKS] = {
-  {"Loop", RESOURCE_ID_TRACK1, RESOURCE_ID_TRACK1_THUMBNAIL}
+  {"Loop", RESOURCE_ID_TRACK1, RESOURCE_ID_TRACK1_THUMBNAIL},
+  {"Twisty", RESOURCE_ID_TRACK2, RESOURCE_ID_TRACK2_THUMBNAIL}
 };
 
 static void menu_select_callback(int index, void *context) {

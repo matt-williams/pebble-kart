@@ -20,6 +20,11 @@
         "type": "png"
       },
       {
+        "name": "SKY",
+        "file": "sky.png",
+        "type": "png"
+      },
+      {
         "name": "FONT",
         "file": "font.png",
         "type": "png"
@@ -32,6 +37,16 @@
       {
         "name": "TRACK1_THUMBNAIL",
         "file": "track1_thumbnail.png",
+        "type": "png"
+      },
+      {
+        "name": "TRACK2",
+        "file": "track2.dat",
+        "type": "raw"
+      },
+      {
+        "name": "TRACK2_THUMBNAIL",
+        "file": "track2_thumbnail.png",
         "type": "png"
       }
     ]

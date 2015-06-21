@@ -6,10 +6,14 @@ static GRect s_window_bounds;
 static uint8_t *s_map;
 static GBitmap *s_tiles;
 static uint8_t *s_tile_data;
+static GBitmap *s_sky;
+static uint8_t *s_sky_data;
 static GBitmap *s_font;
 static uint8_t *s_font_data;
 static AppTimer *s_timer;
 
+int s_laps;
+int s_pos;
 typedef struct TimeMs {
   time_t time_s;
   uint16_t time_ms;
@@ -41,6 +45,14 @@ inline static int get_bit_2d(int32_t x, int32_t z)
   int32_t pixel_x = (tile % 8) * 16 + (((uint32_t)x) / 0x10000) % 16;
   int32_t pixel_z = (tile / 8) * 16 + (((uint32_t)z) / 0x10000) % 16;
   return (s_tile_data[(pixel_x / 8) + pixel_z * 16] >> (pixel_x % 8)) & 1;
+}
+
+inline static bool is_tile_x_finish_line(int tile) {
+  return ((tile == 10) || (tile == 34) || (tile == 40));
+}
+
+inline static bool is_tile_z_finish_line(int tile) {
+  return ((tile == 24) || (tile == 27) || (tile == 41));
 }
 
 typedef struct Kart {
@@ -86,14 +98,39 @@ void kart_update(Kart* kart)
   kart->vz = kart->vz * (1.0 - KART_DRAG) + az;
   int32_t new_x = kart->x + kart->vx * 0x0a;
   int32_t new_z = kart->z + kart->vz * 0x0a;
-  if (get_tile(new_x, new_z) != 4) {
+  int old_tile = get_tile(kart->x, kart->z);
+  int new_tile = get_tile(new_x, new_z);
+  if (new_tile != 4) {
     kart->x = new_x;
     kart->z = new_z;
+  }
+
+  app_log(APP_LOG_LEVEL_ERROR, "race.c", 1, "Old tile %d (%d %d) - new tile %d (%d %d)", old_tile, is_tile_x_finish_line(old_tile), is_tile_z_finish_line(old_tile), new_tile, is_tile_x_finish_line(new_tile), is_tile_z_finish_line(new_tile));  
+  if (!is_tile_x_finish_line(old_tile) &&
+      !is_tile_z_finish_line(old_tile))
+  {
+    if ((is_tile_x_finish_line(new_tile)) &&
+        (kart->vx > 0)) {
+      s_laps ++;
+    } else if ((is_tile_z_finish_line(new_tile)) &&
+               (kart->vz < 0)) {
+      s_laps ++;
+    }
+  } else if (!is_tile_x_finish_line(new_tile) &&
+             !is_tile_z_finish_line(new_tile))
+  {
+    if ((is_tile_x_finish_line(old_tile)) &&
+        (kart->vx < 0)) {
+      s_laps --;
+    } else if ((is_tile_z_finish_line(old_tile)) &&
+               (kart->vz > 0)) {
+      s_laps --;
+    }
   }
 }
 
 
-void draw_timer(uint8_t* raw, uint32_t time_ms, bool flash)
+void draw_status(uint8_t* raw, uint32_t time_ms, int lap, int pos, bool flash)
 {
   int mins = time_ms / 60000;
   int ten_secs = (time_ms % 60000) / 10000;
@@ -101,16 +138,33 @@ void draw_timer(uint8_t* raw, uint32_t time_ms, bool flash)
   int decisecs = (time_ms % 1000) / 100;
   int centisecs = (time_ms % 100) / 10;
   int millisecs = (time_ms % 10);
+
+  uint8_t glyphs[18];
+  glyphs[0] = lap;
+  glyphs[1] = 11;
+  glyphs[2] = 3;
+  glyphs[3] = 12;
+  glyphs[4] = 15; 
+  glyphs[5] = (mins > 0) ? mins : 15;
+  glyphs[6] = (flash && (mins > 0) && (decisecs < 5)) ? 10 : 15;
+  glyphs[7] = (ten_secs > 0) ? ten_secs : 15;
+  glyphs[8] = secs;
+  glyphs[9] = (flash && (decisecs < 5)) ? 10 : 15;
+  glyphs[10] = decisecs;
+  glyphs[11] = centisecs;
+  glyphs[12] = millisecs;
+  glyphs[13] = 15;
+  glyphs[14] = 13;
+  glyphs[15] = pos;
+  glyphs[16] = 11;
+  glyphs[17] = 4;
+
   for (int y = 0; y < 16; y++)
   {
-    if (mins > 0) raw[5 + y * 20] = s_font_data[mins + y * 12];
-    if (flash && (mins > 0) && (decisecs < 5)) raw[6 + y * 20] = s_font_data[10 + y * 12];
-    if (ten_secs > 0) raw[7 + y * 20] = s_font_data[ten_secs + y * 12];
-    raw[8 + y * 20] = s_font_data[secs + y * 12];
-    if (flash && (decisecs < 5)) raw[9 + y * 20] = s_font_data[10 + y * 12];
-    raw[10 + y * 20] = s_font_data[decisecs + y * 12];
-    raw[11 + y * 20] = s_font_data[centisecs + y * 12];
-    raw[12 + y * 20] = s_font_data[millisecs + y * 12];
+    for (int x = 0; x < 18; x++)
+    {
+      raw[x + y * 20] = s_font_data[glyphs[x] + y * 16];
+    }
   }
 }
 
@@ -139,7 +193,6 @@ static void click_config_provider(void *context) {
 
 inline static int get_bit_3d(int32_t x, int32_t y)
 {
-  if (y < (DISPLAY_HEIGHT / 2)) return 0;
   int32_t rx = (x - DISPLAY_WIDTH / 2) * TWICE_COS_HALF_FOV_X / DISPLAY_WIDTH;
   int32_t ry = (y - DISPLAY_HEIGHT / 2) * TWICE_COS_HALF_FOV_Y / DISPLAY_HEIGHT;
   int32_t ray_x = rx * s_kart->cos_r / 0x1000 + s_kart->sin_r;
@@ -155,7 +208,8 @@ static void update_proc(Layer *this_layer, GContext *context) {
   GRect bounds = gbitmap_get_bounds(display);
   int row_size_words = (bounds.size.w + 31) / 32;
 
-  for (int y = 0; y < bounds.size.h; y++) {
+  draw_status((uint8_t*)raw, time_ms_get_time_since(&s_start_time), s_laps, s_pos, true);
+  for (int y = DISPLAY_HEIGHT / 2; y < bounds.size.h; y++) {
     for (int x = 0; x < bounds.size.w;) {
       uint32_t out = 0;
       for (int bit = 0; bit < 32; x++, bit++) {
@@ -165,7 +219,6 @@ static void update_proc(Layer *this_layer, GContext *context) {
     }
   }
 
-  draw_timer((uint8_t*)raw, time_ms_get_time_since(&s_start_time), true);
 }
 
 static void window_load(Window *window) {
@@ -205,10 +258,14 @@ void start_race(uint32_t resource_id) {
   load_map(resource_id);
   s_tiles = gbitmap_create_with_resource(RESOURCE_ID_TILES);
   s_tile_data = gbitmap_get_data(s_tiles);
+  s_sky = gbitmap_create_with_resource(RESOURCE_ID_TILES);
+  s_sky_data = gbitmap_get_data(s_sky);
   s_font = gbitmap_create_with_resource(RESOURCE_ID_FONT);
   s_font_data = gbitmap_get_data(s_font);
 
+  s_laps = 0;
   time_ms_get_time(&s_start_time);
+  s_pos = 1;
 
   s_kart = kart_create();
 
