@@ -240,7 +240,7 @@ static void click_config_provider(void *context) {
   window_raw_click_subscribe(BUTTON_ID_DOWN, down_click_handler, release_handler, NULL);
 }
 
-inline static int get_bit_3d(int32_t x, int32_t y)
+inline static int get_bit_3d(int32_t view_x, int32_t view_z, int32_t x, int32_t y)
 {
   int32_t rx = (x - DISPLAY_WIDTH / 2) * TWICE_COS_HALF_FOV_X / DISPLAY_WIDTH;
   int32_t ry = (y - DISPLAY_HEIGHT / 2) * TWICE_COS_HALF_FOV_Y / DISPLAY_HEIGHT;
@@ -248,7 +248,7 @@ inline static int get_bit_3d(int32_t x, int32_t y)
   int32_t ray_y = ry;
   int32_t ray_z = rx * s_kart->sin_r / 0x1000 - s_kart->cos_r;
   int32_t d = CAM_Y / ray_y;
-  return get_bit_2d(ray_x * d + s_kart->x, ray_z * d + s_kart->z);
+  return get_bit_2d(ray_x * d + view_x, ray_z * d + view_z);
 }
 
 static void update_proc(Layer *this_layer, GContext *context) {
@@ -257,12 +257,15 @@ static void update_proc(Layer *this_layer, GContext *context) {
   GRect bounds = gbitmap_get_bounds(display);
   int row_size_words = (bounds.size.w + 31) / 32;
 
+  int32_t view_x = s_kart->x - s_kart->sin_r * CAM_Y / (DISPLAY_HEIGHT / 2 * TWICE_COS_HALF_FOV_Y / DISPLAY_HEIGHT);
+  int32_t view_z = s_kart->z + s_kart->cos_r * CAM_Y / (DISPLAY_HEIGHT / 2 * TWICE_COS_HALF_FOV_Y / DISPLAY_HEIGHT);
+
   draw_status((uint8_t*)raw, time_ms_get_time_since(&s_start_time), s_laps, s_pos, true);
   for (int y = DISPLAY_HEIGHT / 2; y < bounds.size.h; y++) {
     for (int x = 0; x < bounds.size.w;) {
       uint32_t out = 0;
       for (int bit = 0; bit < 32; x++, bit++) {
-        out |= (get_bit_3d(x, y) << bit);
+        out |= (get_bit_3d(view_x, view_z, x, y) << bit);
       }
       raw[x / 32 - 1 + y * row_size_words] = out;
     }
@@ -270,7 +273,7 @@ static void update_proc(Layer *this_layer, GContext *context) {
 
   graphics_release_frame_buffer(context, display);
   draw_sky(context, s_kart->r);
-  kart_draw(context, s_kart, s_kart->x, s_kart->z, s_kart->r);
+  kart_draw(context, s_kart, view_x, view_z, s_kart->r);
 }
 
 void load_map(uint32_t resource_id) {
