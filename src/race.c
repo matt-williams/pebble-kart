@@ -18,9 +18,9 @@ static AppTimer *s_timer;
 #define DISPLAY_WIDTH 144
 #define DISPLAY_HEIGHT 152
 #define CAM_Y 0x10000
+#define NUM_OTHER_KARTS 3
 
 uint32_t s_map_resource_id;
-int s_laps;
 int s_pos;
 typedef struct TimeMs {
   time_t time_s;
@@ -72,18 +72,21 @@ typedef struct Kart {
   uint16_t dr;
   int32_t sin_r;
   int32_t cos_r;
+  uint16_t laps;
 } Kart;
 Kart *s_kart;
+Kart *s_other_karts[NUM_OTHER_KARTS];
 
-Kart *kart_create() {
+Kart *kart_create(int index) {
   Kart *kart = malloc(sizeof(Kart));
   kart->x = 0x500000;
-  kart->z = 0x3980000;
+  kart->z = 0x3980000 - index * 0x100000;
   kart->vx = 0;
   kart->vz = 0;
   kart->r = 0;
   kart->sin_r = sin_lookup(kart->r);
   kart->cos_r = cos_lookup(kart->r);
+  kart->laps = 0;
   return kart;
 }
 
@@ -118,40 +121,59 @@ void kart_update(Kart* kart)
   {
     if ((is_tile_x_finish_line(new_tile)) &&
         (kart->vx > 0)) {
-      s_laps ++;
+      kart->laps++;
     } else if ((is_tile_z_finish_line(new_tile)) &&
                (kart->vz < 0)) {
-      s_laps ++;
+      kart->laps++;
     }
   } else if (!is_tile_x_finish_line(new_tile) &&
              !is_tile_z_finish_line(new_tile))
   {
     if ((is_tile_x_finish_line(old_tile)) &&
         (kart->vx < 0)) {
-      s_laps --;
+      kart->laps--;
     } else if ((is_tile_z_finish_line(old_tile)) &&
                (kart->vz > 0)) {
-      s_laps --;
+      kart->laps--;
     }
   }
 }
 
 
 void kart_draw(GContext* context, Kart* kart, int32_t view_x, int32_t view_z, uint16_t view_r) {
+  uint16_t dr = (view_r - kart->r + 0x8000) / 0x2000;
+  int32_t dx = kart->x - view_x;
+  int32_t dz = kart->z - view_z;
+  int32_t projected_dx = dx / 0x100 * cos_lookup(view_r) / 0x100 + dz / 0x100 * sin_lookup(view_r) / 0x100;
+  int32_t projected_dz = dx / 0x100 * sin_lookup(view_r) / 0x100 - dz / 0x100 * cos_lookup(view_r) / 0x100;
 
-  uint16_t dr = kart->r - view_r;
-  GRect src_rect = {.origin = {.x = 0, .y = 0}, .size = {.w = 64, .h = 42}};
-  GRect dst_rect = {.origin = {.x = DISPLAY_WIDTH / 2 - 32, .y = DISPLAY_HEIGHT - 42}, .size = {.w = 64, .h = 42}};
+  if (projected_dz > 0)
+  {
+    int32_t screen_x = projected_dx / projected_dz * DISPLAY_WIDTH / TWICE_COS_HALF_FOV_X + DISPLAY_WIDTH / 2;
+    int32_t screen_y = CAM_Y / (projected_dz / 0x10000) * DISPLAY_HEIGHT / TWICE_COS_HALF_FOV_Y + DISPLAY_HEIGHT / 2;
 
-  graphics_context_set_compositing_mode(context, GCompOpClear);
-  GBitmap* kart_section = gbitmap_create_as_sub_bitmap(s_kart_black, src_rect);
-  graphics_draw_bitmap_in_rect(context, kart_section, dst_rect);
-  gbitmap_destroy(kart_section);
+    //app_log(APP_LOG_LEVEL_ERROR, "", 1, "CAM_Y = %ld, projected_dz = %ld, DISPLAY_HEIGHT = %ld, TWICE_COS_HALF_FOV_Y = %ld", (uint32_t)CAM_Y, projected_dz, (uint32_t)DISPLAY_HEIGHT, (uint32_t)TWICE_COS_HALF_FOV_Y);
+    //app_log(APP_LOG_LEVEL_ERROR, "", 1, "CAM_Y / projected_dz = %ld, ... * DISPLAY_HEIGHT = %ld, ... / TWICE_COS_HALF_FOV_Y = %ld", CAM_Y / projected_dz, CAM_Y / projected_dz * DISPLAY_HEIGHT, CAM_Y / projected_dz * DISPLAY_HEIGHT / TWICE_COS_HALF_FOV_Y);
+    //if (kart == s_other_karts[0]) {
+    //    app_log(APP_LOG_LEVEL_ERROR, "", 1, "view_x = %ld, view_z = %ld, kart->x = %ld, kart->z = %ld", view_x, view_z, kart->x, kart->z);
+    //    app_log(APP_LOG_LEVEL_ERROR, "", 1, "dx = %ld, dz = %ld, projected_dx = %ld, projected_dz = %ld", dx, dz, projected_dx, projected_dz);
+    //    app_log(APP_LOG_LEVEL_ERROR, "", 1, "sin(view_r) = %ld, cos(view_r) = %ld", sin_lookup(view_r), cos_lookup(view_r));
+    //}
+    //app_log(APP_LOG_LEVEL_ERROR, "", 1, "screen_x = %ld, screen_y = %ld", screen_x, screen_y);
+    
+    GRect src_rect = {.origin = {.x = dr * 64, .y = 0}, .size = {.w = 64, .h = 42}};
+    GRect dst_rect = {.origin = {.x = screen_x - 32, .y = screen_y - 47}, .size = {.w = 64, .h = 42}};
 
-  graphics_context_set_compositing_mode(context, GCompOpOr);
-  kart_section = gbitmap_create_as_sub_bitmap(s_kart_white, src_rect);
-  graphics_draw_bitmap_in_rect(context, kart_section, dst_rect);
-  gbitmap_destroy(kart_section);
+    graphics_context_set_compositing_mode(context, GCompOpClear);
+    GBitmap* kart_section = gbitmap_create_as_sub_bitmap(s_kart_black, src_rect);
+    graphics_draw_bitmap_in_rect(context, kart_section, dst_rect);
+    gbitmap_destroy(kart_section);
+
+    graphics_context_set_compositing_mode(context, GCompOpOr);
+    kart_section = gbitmap_create_as_sub_bitmap(s_kart_white, src_rect);
+    graphics_draw_bitmap_in_rect(context, kart_section, dst_rect);
+    gbitmap_destroy(kart_section);
+  }
 }
 
 void kart_destroy(Kart* kart) {
@@ -260,7 +282,7 @@ static void update_proc(Layer *this_layer, GContext *context) {
   int32_t view_x = s_kart->x - s_kart->sin_r * CAM_Y / (DISPLAY_HEIGHT / 2 * TWICE_COS_HALF_FOV_Y / DISPLAY_HEIGHT);
   int32_t view_z = s_kart->z + s_kart->cos_r * CAM_Y / (DISPLAY_HEIGHT / 2 * TWICE_COS_HALF_FOV_Y / DISPLAY_HEIGHT);
 
-  draw_status((uint8_t*)raw, time_ms_get_time_since(&s_start_time), s_laps, s_pos, true);
+  draw_status((uint8_t*)raw, time_ms_get_time_since(&s_start_time), s_kart->laps, s_pos, true);
   for (int y = DISPLAY_HEIGHT / 2; y < bounds.size.h; y++) {
     for (int x = 0; x < bounds.size.w;) {
       uint32_t out = 0;
@@ -274,6 +296,9 @@ static void update_proc(Layer *this_layer, GContext *context) {
   graphics_release_frame_buffer(context, display);
   draw_sky(context, s_kart->r);
   kart_draw(context, s_kart, view_x, view_z, s_kart->r);
+  for (int ii = 0; ii < NUM_OTHER_KARTS; ii++) {
+    //kart_draw(context, s_other_karts[ii], view_x, view_z, s_kart->r);
+  }
 }
 
 void load_map(uint32_t resource_id) {
@@ -288,6 +313,9 @@ static void core_loop(void *data) {
 
   kart_steer(s_kart, accel_data.x, s_kart->dr);
   kart_update(s_kart);
+  for (int ii = 0; ii < NUM_OTHER_KARTS; ii++) {
+    kart_update(s_other_karts[ii]);
+  }
 
   layer_mark_dirty(s_window_layer);
   s_timer = app_timer_register(20, core_loop, NULL);
@@ -305,11 +333,14 @@ static void window_load(Window *window) {
   s_font = gbitmap_create_with_resource(RESOURCE_ID_FONT);
   s_font_data = gbitmap_get_data(s_font);
 
-  s_laps = 0;
   time_ms_get_time(&s_start_time);
   s_pos = 1;
 
-  s_kart = kart_create();
+  s_kart = kart_create(0);
+  for (int ii = 0; ii < NUM_OTHER_KARTS; ii++)
+  {
+    s_other_karts[ii] = kart_create(ii + 1);
+  }
   Layer* window_layer = window_get_root_layer(window);
   s_window_bounds = layer_get_bounds(window_layer);
   GRect window_frame = layer_get_frame(window_layer);
@@ -329,6 +360,10 @@ static void window_unload(Window *window) {
   layer_destroy(s_window_layer);
 
   kart_destroy(s_kart);
+  for (int ii = 0; ii < NUM_OTHER_KARTS; ii++)
+  {
+    kart_destroy(s_other_karts[ii]);
+  }
 
   gbitmap_destroy(s_font);
   gbitmap_destroy(s_sky);
