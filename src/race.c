@@ -153,6 +153,9 @@ void kart_draw(GContext* context, Kart* kart, int32_t view_x, int32_t view_z, ui
   gbitmap_destroy(kart_section);
 }
 
+void kart_destroy(Kart* kart) {
+  free(kart);
+}
 
 static void draw_status(uint8_t* raw, uint32_t time_ms, int lap, int pos, bool flash)
 {
@@ -336,6 +339,14 @@ void end_race(void) {
   accel_data_service_unsubscribe();
 
   window_destroy(s_window);
+
+  kart_destroy(s_kart);
+  gbitmap_destroy(s_font);
+  gbitmap_destroy(s_sky);
+  gbitmap_destroy(s_tiles);
+  gbitmap_destroy(s_kart_white);
+  gbitmap_destroy(s_kart_black);
+  free(s_map);
 
   light_enable(false);
 }
