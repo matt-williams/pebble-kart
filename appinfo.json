@@ -15,6 +15,11 @@
   "resources": {
     "media": [
       {
+        "name": "KART",
+        "file": "kart.png",
+        "type": "png"
+      },
+      {
         "name": "TILES",
         "file": "tiles.png",
         "type": "png"

@@ -4,6 +4,7 @@ static Window *s_window;
 static Layer *s_window_layer;
 static GRect s_window_bounds;
 static uint8_t *s_map;
+static GBitmap *s_kart_sprites;
 static GBitmap *s_tiles;
 static uint8_t *s_tile_data;
 static GBitmap *s_sky;
@@ -53,11 +54,11 @@ inline static int get_bit_2d(int32_t x, int32_t z)
 }
 
 inline static bool is_tile_x_finish_line(int tile) {
-  return ((tile == 10) || (tile == 34) || (tile == 40));
+  return ((tile == 10) || (tile == 34) || (tile == 40) || (tile == 48));
 }
 
 inline static bool is_tile_z_finish_line(int tile) {
-  return ((tile == 24) || (tile == 27) || (tile == 41));
+  return ((tile == 24) || (tile == 27) || (tile == 41) || (tile == 49));
 }
 
 typedef struct Kart {
@@ -283,6 +284,7 @@ void start_race(uint32_t resource_id) {
   light_enable(true);
 
   load_map(resource_id);
+  s_kart_sprites = gbitmap_create_with_resource(RESOURCE_ID_KART);
   s_tiles = gbitmap_create_with_resource(RESOURCE_ID_TILES);
   s_tile_data = gbitmap_get_data(s_tiles);
   s_sky = gbitmap_create_with_resource(RESOURCE_ID_SKY);
