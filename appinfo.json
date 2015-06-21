@@ -1,0 +1,34 @@
+{
+  "uuid": "62933cb0-ece5-426c-b517-e997d90e56f9",
+  "shortName": "Kart",
+  "longName": "Kart",
+  "companyName": "Matt Williams",
+  "versionLabel": "1.0",
+  "sdkVersion": "3",
+  "targetPlatforms": ["aplite", "basalt"],
+  "watchapp": {
+    "watchface": false
+  },
+  "appKeys": {
+    "dummy": 0
+  },
+  "resources": {
+    "media": [
+      {
+        "name": "TILES",
+        "file": "tiles.png",
+        "type": "png"
+      },
+      {
+        "name": "FONT",
+        "file": "font.png",
+        "type": "png"
+      },
+      {
+        "name": "TRACK1",
+        "file": "track1.dat",
+        "type": "raw"
+      }
+    ]
+  }
+}

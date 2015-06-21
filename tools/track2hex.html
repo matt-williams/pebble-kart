@@ -1,0 +1,20 @@
+<html>
+<head>
+<title>Track2Hex</title>
+</head>
+<body>
+<script>
+function convert(data) {
+  var tiles = data.layers[0].data;
+  for (var y = 0; y < 64; y++) {
+    for (var x = 0; x < 64; x++) {
+      var hex = (tiles[x + y * 64] - 1).toString(16);
+      document.write('00'.substr(hex.length) + hex + ' ');
+    }
+    document.write('<br />');
+  }
+}
+</script>
+<script src="track1.js"></script>
+</body>
+</html>
