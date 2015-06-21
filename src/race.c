@@ -20,13 +20,15 @@ static AppTimer *s_timer;
 #define CAM_Y 0x10000
 #define NUM_OTHER_KARTS 3
 
-uint32_t s_map_resource_id;
-int s_pos;
+static uint32_t s_map_resource_id;
+static int s_pos;
+static bool s_completed;
 typedef struct TimeMs {
   time_t time_s;
   uint16_t time_ms;
 } TimeMs;
 TimeMs s_start_time;
+uint32_t s_last_time_ms;
 
 void time_ms_get_time(TimeMs* t) {
   time_ms(&t->time_s, &t->time_ms);
@@ -197,7 +199,7 @@ static void draw_status(uint8_t* raw, uint32_t time_ms, int lap, int pos, bool f
   glyphs[4] = 15; 
   glyphs[5] = (mins > 0) ? mins : 15;
   glyphs[6] = (flash && (mins > 0) && (decisecs < 5)) ? 10 : 15;
-  glyphs[7] = (ten_secs > 0) ? ten_secs : 15;
+  glyphs[7] = ((mins > 0) || (ten_secs > 0)) ? ten_secs : 15;
   glyphs[8] = secs;
   glyphs[9] = (flash && (decisecs < 5)) ? 10 : 15;
   glyphs[10] = decisecs;
@@ -282,7 +284,8 @@ static void update_proc(Layer *this_layer, GContext *context) {
   int32_t view_x = s_kart->x - s_kart->sin_r * CAM_Y / (DISPLAY_HEIGHT / 2 * TWICE_COS_HALF_FOV_Y / DISPLAY_HEIGHT);
   int32_t view_z = s_kart->z + s_kart->cos_r * CAM_Y / (DISPLAY_HEIGHT / 2 * TWICE_COS_HALF_FOV_Y / DISPLAY_HEIGHT);
 
-  draw_status((uint8_t*)raw, time_ms_get_time_since(&s_start_time), s_kart->laps, s_pos, true);
+  s_last_time_ms = time_ms_get_time_since(&s_start_time);
+  draw_status((uint8_t*)raw, s_last_time_ms, s_kart->laps, s_pos, true);
   for (int y = DISPLAY_HEIGHT / 2; y < bounds.size.h; y++) {
     for (int x = 0; x < bounds.size.w;) {
       uint32_t out = 0;
@@ -322,6 +325,17 @@ static void core_loop(void *data) {
     layer_mark_dirty(s_window_layer);
     s_timer = app_timer_register(20, core_loop, NULL);
   }
+  else if (!s_completed)
+  {
+    s_completed = true;
+    int32_t record_ms = persist_read_int(s_map_resource_id);
+    if (record_ms == 0) {
+      record_ms = 180000;
+    }
+    if (record_ms > (int32_t)s_last_time_ms) {
+      persist_write_int(s_map_resource_id, s_last_time_ms);
+    }
+  }
 }
 
 static void window_load(Window *window) {
@@ -336,6 +350,7 @@ static void window_load(Window *window) {
   s_font = gbitmap_create_with_resource(RESOURCE_ID_FONT);
   s_font_data = gbitmap_get_data(s_font);
 
+  s_completed = false;
   time_ms_get_time(&s_start_time);
   s_pos = 1;
 
