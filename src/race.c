@@ -6,6 +6,10 @@ static GRect s_window_bounds;
 static uint8_t *s_map;
 static GBitmap *s_kart_black;
 static GBitmap *s_kart_white;
+static GBitmap *s_kart_black2;
+static GBitmap *s_kart_white2;
+static GBitmap *s_kart_black3;
+static GBitmap *s_kart_white3;
 static GBitmap *s_tiles;
 static uint8_t *s_tile_data;
 static GBitmap *s_sky;
@@ -143,7 +147,7 @@ void kart_update(Kart* kart)
 
 
 void kart_draw(GContext* context, Kart* kart, int32_t view_x, int32_t view_z, uint16_t view_r) {
-  uint16_t dr = (view_r - kart->r + 0x8000) / 0x2000;
+  uint16_t dr = ((view_r - kart->r + 0x8000) % 0x10000) / 0x2000;
   int32_t dx = kart->x - view_x;
   int32_t dz = kart->z - view_z;
   int32_t projected_dx = dx / 0x100 * cos_lookup(view_r) / 0x100 + dz / 0x100 * sin_lookup(view_r) / 0x100;
@@ -151,7 +155,7 @@ void kart_draw(GContext* context, Kart* kart, int32_t view_x, int32_t view_z, ui
 
   if (projected_dz > 0)
   {
-    int32_t screen_x = projected_dx / projected_dz * DISPLAY_WIDTH / TWICE_COS_HALF_FOV_X + DISPLAY_WIDTH / 2;
+    int32_t screen_x = projected_dx / (projected_dz / 0x10000) * DISPLAY_WIDTH / TWICE_COS_HALF_FOV_X + DISPLAY_WIDTH / 2;
     int32_t screen_y = CAM_Y / (projected_dz / 0x10000) * DISPLAY_HEIGHT / TWICE_COS_HALF_FOV_Y + DISPLAY_HEIGHT / 2;
 
     //app_log(APP_LOG_LEVEL_ERROR, "", 1, "CAM_Y = %ld, projected_dz = %ld, DISPLAY_HEIGHT = %ld, TWICE_COS_HALF_FOV_Y = %ld", (uint32_t)CAM_Y, projected_dz, (uint32_t)DISPLAY_HEIGHT, (uint32_t)TWICE_COS_HALF_FOV_Y);
@@ -163,16 +167,34 @@ void kart_draw(GContext* context, Kart* kart, int32_t view_x, int32_t view_z, ui
     //}
     //app_log(APP_LOG_LEVEL_ERROR, "", 1, "screen_x = %ld, screen_y = %ld", screen_x, screen_y);
     
-    GRect src_rect = {.origin = {.x = dr * 64, .y = 0}, .size = {.w = 64, .h = 42}};
-    GRect dst_rect = {.origin = {.x = screen_x - 32, .y = screen_y - 47}, .size = {.w = 64, .h = 42}};
+    GBitmap* kart_black;
+    GBitmap* kart_white;
+    GRect src_rect;
+    GRect dst_rect;
+    if (projected_dz < 0x400000) {
+      kart_black = s_kart_black;
+      kart_white = s_kart_white;
+      src_rect = (GRect){.origin = {.x = dr * 64, .y = 0}, .size = {.w = 64, .h = 42}};
+      dst_rect = (GRect){.origin = {.x = screen_x - 32, .y = screen_y - 47}, .size = {.w = 64, .h = 42}};
+    } else if (projected_dz < 0x800000) {
+      kart_black = s_kart_black2;
+      kart_white = s_kart_white2;
+      src_rect = (GRect){.origin = {.x = dr * 32, .y = 0}, .size = {.w = 32, .h = 21}};
+      dst_rect = (GRect){.origin = {.x = screen_x - 16, .y = screen_y - 28}, .size = {.w = 32, .h = 21}};
+    } else {
+      kart_black = s_kart_black3;
+      kart_white = s_kart_white3;
+      src_rect = (GRect){.origin = {.x = dr * 16, .y = 0}, .size = {.w = 16, .h = 11}};
+      dst_rect = (GRect){.origin = {.x = screen_x - 8, .y = screen_y - 16}, .size = {.w = 16, .h = 11}};
+    }
 
     graphics_context_set_compositing_mode(context, GCompOpClear);
-    GBitmap* kart_section = gbitmap_create_as_sub_bitmap(s_kart_black, src_rect);
+    GBitmap* kart_section = gbitmap_create_as_sub_bitmap(kart_black, src_rect);
     graphics_draw_bitmap_in_rect(context, kart_section, dst_rect);
     gbitmap_destroy(kart_section);
 
     graphics_context_set_compositing_mode(context, GCompOpOr);
-    kart_section = gbitmap_create_as_sub_bitmap(s_kart_white, src_rect);
+    kart_section = gbitmap_create_as_sub_bitmap(kart_white, src_rect);
     graphics_draw_bitmap_in_rect(context, kart_section, dst_rect);
     gbitmap_destroy(kart_section);
   }
@@ -344,6 +366,10 @@ static void window_load(Window *window) {
   load_map(s_map_resource_id);
   s_kart_black = gbitmap_create_with_resource(RESOURCE_ID_KART_BLACK);
   s_kart_white = gbitmap_create_with_resource(RESOURCE_ID_KART_WHITE);
+  s_kart_black2 = gbitmap_create_with_resource(RESOURCE_ID_KART_BLACK2);
+  s_kart_white2 = gbitmap_create_with_resource(RESOURCE_ID_KART_WHITE2);
+  s_kart_black3 = gbitmap_create_with_resource(RESOURCE_ID_KART_BLACK3);
+  s_kart_white3 = gbitmap_create_with_resource(RESOURCE_ID_KART_WHITE3);
   s_tiles = gbitmap_create_with_resource(RESOURCE_ID_TILES);
   s_tile_data = gbitmap_get_data(s_tiles);
   s_sky = gbitmap_create_with_resource(RESOURCE_ID_SKY);
@@ -388,6 +414,10 @@ static void window_unload(Window *window) {
   gbitmap_destroy(s_tiles);
   gbitmap_destroy(s_kart_white);
   gbitmap_destroy(s_kart_black);
+  gbitmap_destroy(s_kart_white2);
+  gbitmap_destroy(s_kart_black2);
+  gbitmap_destroy(s_kart_white3);
+  gbitmap_destroy(s_kart_black3);
   free(s_map);
 
   light_enable(false);
