@@ -28,6 +28,11 @@
         "name": "TRACK1",
         "file": "track1.dat",
         "type": "raw"
+      },
+      {
+        "name": "TRACK1_THUMBNAIL",
+        "file": "track1_thumbnail.png",
+        "type": "png"
       }
     ]
   }
