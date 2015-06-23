@@ -21,6 +21,21 @@
         "type": "png"
       },
       {
+        "name": "KART",
+        "file": "kart.png",
+        "type": "png"
+      },
+      {
+        "name": "KART2",
+        "file": "kart2.png",
+        "type": "png"
+      },
+      {
+        "name": "KART3",
+        "file": "kart3.png",
+        "type": "png"
+      },
+      {
         "name": "KART_BLACK",
         "file": "kart_black.png",
         "type": "png"
